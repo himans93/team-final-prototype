@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChoreAI Prototype (LocalStorage + Voice)</title>
+  <style>
+    :root{
+      --bg: #f6f4ff;
+      --card: #ffffff;
+      --ink: #142033;
+      --muted:#6b768a;
+      --purple:#7c4dff;
+      --purple2:#b56bff;
+      --border:#ebe7ff;
+      --shadow: 0 18px 50px rgba(30, 26, 75, .18);
+      --shadow2: 0 10px 24px rgba(30, 26, 75, .12);
+      --danger:#ff4d5a;
+      --ok:#27c171;
+      --pill:#eef1ff;
+      --radius: 22px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 30% 0%, #efeaff 0%, #f6f4ff 45%, #f7fbff 100%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      color:var(--ink);
+    }
+
+    /* Phone frame */
+    .phone{
+      width: 380px;
+      max-width: 92vw;
+      background: #0b0b10;
+      border-radius: 46px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+    .screen{
+      background: var(--bg);
+      border-radius: 38px;
+      overflow:hidden;
+      position:relative;
+      height: 760px;
+      max-height: 88vh;
+    }
+
+    /* Notch */
+    .notch{
+      position:absolute;
+      top:0;
+      left:50%;
+      transform:translateX(-50%);
+      width: 170px;
+      height: 26px;
+      background:#0b0b10;
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      z-index: 20;
+    }
+
+    /* Header */
+    .header{
+      padding: 44px 18px 16px;
+      background: linear-gradient(135deg, #5b66ff, #9b49ff);
+      color:#fff;
+      position: sticky;
+      top:0;
+      z-index: 10;
+    }
+    .brand{
+      font-weight: 700;
+      letter-spacing:.2px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .brand small{
+      display:block;
+      font-weight:500;
+      opacity:.88;
+      margin-top:3px;
+    }
+
+    .iconbtn{
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.14);
+      color:#fff;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      transition: transform .12s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .iconbtn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.18); }
+    .iconbtn:active{ transform: translateY(0px) scale(.98); }
+
+    /* Mic live state */
+    .mic-live{
+      outline: 3px solid rgba(255,255,255,.32);
+      box-shadow: 0 0 0 10px rgba(255,255,255,.12);
+    }
+
+    /* Top sub tabs */
+    .top-tabs{
+      background:#fff;
+      display:flex;
+      justify-content:space-around;
+      padding: 12px 10px 0;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 112px;
+      z-index: 9;
+    }
+    .top-tab{
+      flex:1;
+      text-align:center;
+      padding: 10px 6px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      cursor:pointer;
+      user-select:none;
+    }
+    .top-tab.active{
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+      font-weight: 600;
+    }
+
+    /* Content area */
+    .content{
+      padding: 14px 14px 84px;
+      overflow:auto;
+      height: calc(100% - 112px - 56px); /* header + bottom nav */
+    }
+
+    .panel{ display:none; }
+    .panel.active{ display:block; }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow2);
+      padding: 14px;
+    }
+
+    /* AI Suggestions */
+    .ai-card{
+      background: linear-gradient(180deg, rgba(124,77,255,.10), rgba(155,73,255,.06));
+      border: 1px solid rgba(124,77,255,.18);
+    }
+    .ai-title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:700;
+      margin-bottom: 8px;
+      color: #3b2a86;
+    }
+    .sparkle{
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      background: rgba(124,77,255,.15);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border: 1px solid rgba(124,77,255,.22);
+    }
+    .ai-sub{ color:#4b4f7a; font-size: 13px; margin-bottom: 10px; }
+
+    .suggestion{
+      background:#fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin: 8px 0;
+    }
+    .suggestion span{ font-size: 13px; }
+    .mini-plus{
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(124,77,255,.22);
+      background: rgba(124,77,255,.10);
+      color: #4a2bff;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 18px;
+      line-height: 1;
+      user-select:none;
+    }
+    .ai-more{
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(124,77,255,.20);
+      background: rgba(255,255,255,.55);
+      color:#4a2bff;
+      padding: 10px 12px;
+      cursor:pointer;
+      margin-top: 10px;
+      font-weight: 600;
+    }
+
+    /* Add dashed */
+    .add-dashed{
+      margin-top: 12px;
+      border: 2px dashed rgba(124,77,255,.35);
+      border-radius: 18px;
+      padding: 14px;
+      color: #4a2bff;
+      background: rgba(255,255,255,.55);
+      cursor:pointer;
+      user-select:none;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    /* Active chores list */
+    .section-title{
+      margin: 14px 4px 10px;
+      font-size: 12px;
+      letter-spacing: .12em;
+      color: #5b5f79;
+    }
+    .task{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:#fff;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow2);
+      border-radius: 18px;
+      padding: 10px 10px 10px 10px;
+      margin-bottom: 10px;
+    }
+    .task-left{
+      display:flex;
+      align-items:flex-start;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    /* Done check (red -> green) */
+    .donebtn{
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 2px solid var(--danger);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      flex-shrink:0;
+      margin-top: 2px;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+      user-select:none;
+      color: transparent;
+    }
+    .donebtn:hover{ transform: translateY(-1px); }
+    .donebtn.done{
+      border-color: var(--ok);
+      background: rgba(39,193,113,.15);
+      color: var(--ok);
+    }
+
+    .task-title{
+      font-weight: 700;
+      font-size: 14px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 220px;
+    }
+    .pillrow{
+      display:flex;
+      gap:8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .pill{
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--pill);
+      color:#4b4f7a;
+      border: 1px solid rgba(124,77,255,.14);
+    }
+    .pill.today{ background: rgba(124,77,255,.14); color:#4a2bff; }
+    .pill.done{ background: rgba(39,193,113,.14); color: var(--ok); border-color: rgba(39,193,113,.22); }
+
+    .task-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-shrink:0;
+    }
+    .squarebtn{
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition: transform .12s ease, border-color .12s ease;
+    }
+    .squarebtn:hover{ transform: translateY(-1px); border-color: rgba(124,77,255,.25); }
+    .squarebtn.delete{ border-color: rgba(255,77,90,.25); }
+    .squarebtn.delete:hover{ border-color: rgba(255,77,90,.6); }
+
+    /* History calendar */
+    .history-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 8px 4px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing:.1em;
+    }
+    .calendar-card .cal-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 10px;
+    }
+    .cal-month{
+      font-weight: 800;
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .cal-nav{
+      display:flex;
+      gap:8px;
+    }
+    .cal-btn{
+      width: 30px;
+      height: 30px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+    }
+    .cal-grid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      padding: 4px 2px;
+    }
+    .cal-dow{
+      text-align:center;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+    .cal-day{
+      position:relative;
+      text-align:center;
+      padding: 10px 0;
+      border-radius: 12px;
+      font-size: 13px;
+      color: var(--ink);
+      border: 1px solid transparent;
+    }
+    .cal-day.muted{ color: #a2a9b6; }
+    .cal-day.today{
+      border-color: rgba(124,77,255,.28);
+      background: rgba(124,77,255,.10);
+      font-weight: 800;
+      color:#4a2bff;
+    }
+    .dot{
+      position:absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--purple);
+      left:50%;
+      transform: translateX(-50%);
+      bottom: 6px;
+      opacity:.95;
+    }
+    .cal-note{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Last done */
+    .lastdone .task-title{ max-width: 180px; }
+    .empty{
+      color: var(--muted);
+      font-size: 13px;
+      padding: 14px 6px;
+    }
+
+    /* Fairness */
+    .fair-card{
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .fair-title{
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .person-row{
+      background:#fff;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow2);
+      border-radius: 18px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .person-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .avatar{
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 2px solid rgba(124,77,255,.45);
+      background: rgba(124,77,255,.10);
+      flex-shrink:0;
+    }
+    .person-name{
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .person-sub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .stats{
+      text-align:right;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .barlabel{
+      display:flex;
+      justify-content:space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    .bar{
+      height: 10px;
+      background: rgba(124,77,255,.12);
+      border-radius: 999px;
+      overflow:hidden;
+      border: 1px solid rgba(124,77,255,.12);
+      margin-top: 6px;
+    }
+    .fill{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, var(--purple), var(--purple2));
+      border-radius: 999px;
+    }
+
+    .ring-card{
+      text-align:center;
+      padding: 18px 14px;
+    }
+    .ring{
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      margin: 10px auto 8px;
+      display:grid;
+      place-items:center;
+      background: conic-gradient(var(--purple) 0deg, rgba(124,77,255,.18) 0deg);
+      position: relative;
+    }
+    .ring::after{
+      content:"";
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: #fff;
+      position:absolute;
+      inset: 16px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow2);
+    }
+    .ring span{
+      position: relative;
+      z-index: 1;
+      font-weight: 900;
+      color: #4a2bff;
+    }
+    .ring-note{
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    /* Bottom nav */
+    .bottom{
+      position:absolute;
+      left:0; right:0; bottom:0;
+      height: 60px;
+      background:#fff;
+      border-top: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-around;
+      padding: 8px 10px;
+      z-index: 15;
+    }
+    .navitem{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor:pointer;
+      user-select:none;
+      width: 90px;
+      padding: 6px 6px;
+      border-radius: 999px;
+    }
+    .navitem.active{
+      color:#fff;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      box-shadow: 0 10px 20px rgba(124,77,255,.25);
+    }
+    .navicon{
+      width: 18px;
+      height: 18px;
+      display:block;
+    }
+    .navitem.active svg path{ fill:#fff; }
+    .navitem svg path{ fill: var(--muted); }
+
+    /* Floating add button (exists on all screens) */
+    .fab{
+      position:absolute;
+      right: 18px;
+      bottom: 78px;
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      box-shadow: 0 18px 30px rgba(124,77,255,.35);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size: 30px;
+      cursor:pointer;
+      user-select:none;
+      z-index: 16;
+    }
+
+    /* Modal */
+    .overlay{
+      position:absolute;
+      inset:0;
+      background: rgba(0,0,0,.42);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 16px;
+      z-index: 30;
+    }
+    .overlay.show{ display:flex; }
+    .modal{
+      width: 92%;
+      background:#fff;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 18px 16px 16px;
+      position:relative;
+    }
+    .modal h3{ margin: 2px 0 12px; }
+    .modal .close{
+      position:absolute;
+      right: 12px;
+      top: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background:#fff;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+    }
+    .field{
+      margin: 12px 0;
+    }
+    .label{
+      font-size: 11px;
+      color: #4a2bff;
+      letter-spacing:.06em;
+      margin-bottom: 6px;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    input[type="text"], select, input[type="date"]{
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 2px solid rgba(124,77,255,.22);
+      outline:none;
+      font-size: 14px;
+      background:#fff;
+      transition: border-color .12s ease;
+    }
+    input[type="text"]:focus, select:focus, input[type="date"]:focus{
+      border-color: rgba(124,77,255,.6);
+    }
+    .mic-mini{
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: 2px solid rgba(124,77,255,.22);
+      color:#4a2bff;
+      background: rgba(124,77,255,.08);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      flex-shrink:0;
+      transition: transform .12s ease;
+    }
+    .mic-mini:hover{ transform: translateY(-1px); }
+    .mic-mini.mic-live{
+      outline: 3px solid rgba(124,77,255,.25);
+      box-shadow: 0 0 0 10px rgba(124,77,255,.10);
+    }
+
+    .actions{
+      display:flex;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .btn{
+      flex: 1;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 2px solid rgba(124,77,255,.22);
+      background:#fff;
+      cursor:pointer;
+      font-weight: 700;
+    }
+    .btn.primary{
+      border-color: transparent;
+      color:#fff;
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+    }
+    .btn.primary:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    /* Toast */
+    .toast{
+      position:absolute;
+      top: 126px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20,32,51,.98);
+      color:#fff;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      box-shadow: 0 14px 28px rgba(0,0,0,.22);
+      opacity:0;
+      animation: toast 1.55s ease forwards;
+      z-index: 40;
+      pointer-events:none;
+      max-width: 90%;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    @keyframes toast{
+      0%{ opacity:0; transform: translate(-50%,-8px) scale(.98); }
+      18%{ opacity:1; transform: translate(-50%,0) scale(1); }
+      78%{ opacity:1; transform: translate(-50%,0) scale(1); }
+      100%{ opacity:0; transform: translate(-50%,-6px) scale(.98); }
+    }
+
+    /* Confetti */
+    .confetti{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow: visible;
+      z-index: 35;
+    }
+    .piece{
+      position:absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      opacity: 0;
+      animation: pop .9s ease-out forwards;
+    }
+    @keyframes pop{
+      0%{ transform: translate(0,0) scale(.6) rotate(0deg); opacity:0; }
+      18%{ opacity:1; }
+      100%{ transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--rot)); opacity:0; }
+    }
+
+    /* Scrollbar (desktop preview) */
+    .content::-webkit-scrollbar{ width: 8px; }
+    .content::-webkit-scrollbar-thumb{ background: rgba(20,32,51,.18); border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="screen">
+      <div class="notch"></div>
+
+      <div class="header">
+        <div class="brand">
+          <div>
+            ChoreAI
+            <small>Family Chores</small>
+          </div>
+          <!-- MIC BUTTON (voice entry) -->
+          <button class="iconbtn" id="micBtn" title="Voice entry (optional)">
+            <!-- mic icon -->
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="white" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="top-tabs" role="tablist" aria-label="Top tabs">
+        <div class="top-tab active" data-top="thisweek">This Week</div>
+        <div class="top-tab" data-top="completed">Completed</div>
+        <div class="top-tab" data-top="all">All</div>
+      </div>
+
+      <div class="content" id="content">
+        <!-- HOME -->
+        <section class="panel active" data-panel="home">
+          <div class="card ai-card">
+            <div class="ai-title">
+              <div class="sparkle">✨</div>
+              AI Suggestions
+            </div>
+            <div class="ai-sub">Based on your household, these chores might need attention:</div>
+            <div id="suggestions"></div>
+            <button class="ai-more" id="moreSuggestions">Get more suggestions</button>
+          </div>
+
+          <div class="add-dashed" id="addDashed">+ Add new chore</div>
+
+          <div class="section-title">ACTIVE CHORES</div>
+          <div id="activeList"></div>
+        </section>
+
+        <!-- HISTORY -->
+        <section class="panel" data-panel="history">
+          <div class="history-header">HISTORY</div>
+
+          <div class="card calendar-card">
+            <div class="cal-top">
+              <div class="cal-month" id="calMonth"></div>
+              <div class="cal-nav">
+                <div class="cal-btn" id="calPrev" aria-label="Previous month">‹</div>
+                <div class="cal-btn" id="calNext" aria-label="Next month">›</div>
+              </div>
+            </div>
+
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-note">Dots indicate days when chores were completed.</div>
+          </div>
+
+          <div class="section-title">LAST DONE</div>
+          <div id="lastDoneList" class="lastdone"></div>
+        </section>
+
+        <!-- FAIRNESS -->
+        <section class="panel" data-panel="fairness">
+          <div class="card fair-card">
+            <div class="fair-title">This Week · Chore Distribution</div>
+            <div id="fairPeople"></div>
+          </div>
+
+          <div class="card ring-card">
+            <div style="font-weight:800;color:#4a2bff;">Fairness Score</div>
+            <div class="ring" id="fairRing"><span id="fairPct">--%</span></div>
+            <div class="ring-note" id="fairNote">Distribution summary will appear here.</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Floating Add -->
+      <div class="fab" id="fab" title="Add chore">+</div>
+
+      <!-- Bottom Nav -->
+      <nav class="bottom" aria-label="Bottom nav">
+        <div class="navitem active" data-nav="home">
+          <svg class="navicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          Home
+        </div>
+        <div class="navitem" data-nav="history">
+          <svg class="navicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 16H5V9h14v11Zm0-13H5V6h14v1Z"/></svg>
+          History
+        </div>
+        <div class="navitem" data-nav="fairness">
+          <svg class="navicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 17.93c-2.83.48-5.66-.3-7.78-2.12l1.42-1.42A7.01 7.01 0 0 0 13 19.93ZM4.07 11H6.1a6.96 6.96 0 0 0 1.46 4.11l-1.43 1.43A8.93 8.93 0 0 1 4.07 11ZM11 4.07V6.1a6.96 6.96 0 0 0-4.11 1.46L5.46 6.13A8.93 8.93 0 0 1 11 4.07ZM12 17c-2.76 0-5-2.24-5-5h5V7c2.76 0 5 2.24 5 5s-2.24 5-5 5Zm5.11-9.54A6.96 6.96 0 0 0 13 6.1V4.07c2.14.33 4.1 1.36 5.54 2.82l-1.43 1.42ZM19.93 13H17.9a6.96 6.96 0 0 0-1.46-4.11l1.43-1.43A8.93 8.93 0 0 1 19.93 13Z"/></svg>
+          Fairness
+        </div>
+      </nav>
+
+      <!-- Modal -->
+      <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Add chore modal">
+        <div class="modal">
+          <button class="close" id="closeModal" aria-label="Close">✕</button>
+          <h3 id="modalTitle">Add Chore</h3>
+
+          <div class="field">
+            <div class="label">CHORE NAME *</div>
+            <div class="row">
+              <input id="choreName" type="text" placeholder="e.g. Vacuum living room" />
+              <!-- Optional mic inside modal as well -->
+              <button class="mic-mini" id="micMini" title="Dictate chore name (optional)">
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#4a2bff" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="label">ASSIGN TO</div>
+            <select id="assignee">
+              <option value="Unassigned">Unassigned</option>
+              <option value="Mom">Mom</option>
+              <option value="Dad">Dad</option>
+              <option value="Sarah">Sarah</option>
+              <option value="Jake">Jake</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <div class="label">DUE DATE</div>
+            <select id="duePreset">
+              <option value="today">Today</option>
+              <option value="tomorrow">Tomorrow</option>
+              <option value="weekend">This weekend</option>
+              <option value="pick">Pick a date…</option>
+            </select>
+          </div>
+
+          <div class="field" id="datePickWrap" style="display:none;">
+            <div class="label">PICK DATE</div>
+            <input id="dueDate" type="date" />
+          </div>
+
+          <div class="field">
+            <div class="label">FREQUENCY</div>
+            <select id="frequency">
+              <option value="Once">Once</option>
+              <option value="Daily">Daily</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Biweekly">Biweekly</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+          </div>
+
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;">
+            Data stays on this device (LocalStorage). Voice entry is optional; your browser may process speech via its provider.
+          </div>
+
+          <div class="actions">
+            <button class="btn" id="cancelBtn">Cancel</button>
+            <button class="btn primary" id="saveBtn" disabled>Add Chore</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="confetti" id="confetti"></div>
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * LocalStorage + State
+     ***********************/
+    const LS_KEY = "choreai_prototype_v1";
+
+    const MEMBERS = ["Mom","Dad","Sarah","Jake","Unassigned"];
+
+    const defaultState = () => ({
+      chores: [
+        { id: uid(), name:"Take out trash", assignee:"Sam", dueISO: isoToday(), frequency:"Daily", status:"active", createdAt: Date.now(), completedAt: null },
+        { id: uid(), name:"Clean bathroom", assignee:"Mom", dueISO: isoAddDays(1), frequency:"Weekly", status:"active", createdAt: Date.now(), completedAt: null },
+      ],
+      calendarCursor: startOfMonth(new Date()).toISOString(),
+      topFilter: "thisweek"
+    });
+
+    let state = loadState();
+    let editingId = null;
+
+    function loadState(){
+      try{
+        const raw = localStorage.getItem(LS_KEY);
+        if(!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        // Small migration safety
+        parsed.chores ||= [];
+        parsed.calendarCursor ||= startOfMonth(new Date()).toISOString();
+        parsed.topFilter ||= "thisweek";
+        return parsed;
+      }catch{
+        return defaultState();
+      }
+    }
+    function saveState(){
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    }
+
+    /***********************
+     * Helpers (dates)
+     ***********************/
+    function pad(n){ return String(n).padStart(2,"0"); }
+    function isoFromDate(d){
+      const y = d.getFullYear(), m = pad(d.getMonth()+1), day = pad(d.getDate());
+      return `${y}-${m}-${day}`;
+    }
+    function isoToday(){ return isoFromDate(new Date()); }
+    function isoAddDays(days){
+      const d = new Date();
+      d.setDate(d.getDate()+days);
+      return isoFromDate(d);
+    }
+    function parseISO(iso){
+      const [y,m,d] = iso.split("-").map(Number);
+      return new Date(y, m-1, d);
+    }
+    function startOfMonth(date){
+      return new Date(date.getFullYear(), date.getMonth(), 1);
+    }
+    function endOfMonth(date){
+      return new Date(date.getFullYear(), date.getMonth()+1, 0);
+    }
+    function sameDay(a,b){
+      return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+    function startOfWeekMonday(d){
+      const x = new Date(d);
+      const day = (x.getDay()+6)%7; // Monday=0
+      x.setDate(x.getDate()-day);
+      x.setHours(0,0,0,0);
+      return x;
+    }
+    function endOfWeekMonday(d){
+      const s = startOfWeekMonday(d);
+      const e = new Date(s);
+      e.setDate(e.getDate()+6);
+      e.setHours(23,59,59,999);
+      return e;
+    }
+    function inThisWeek(iso){
+      const d = parseISO(iso);
+      const s = startOfWeekMonday(new Date());
+      const e = endOfWeekMonday(new Date());
+      return d >= s && d <= e;
+    }
+    function formatMonthYear(date){
+      return date.toLocaleString(undefined, { month:"long", year:"numeric" });
+    }
+    function fmtShort(iso){
+      const d = parseISO(iso);
+      return d.toLocaleString(undefined, { month:"short", day:"numeric" });
+    }
+    function isTodayISO(iso){ return iso === isoToday(); }
+
+    /***********************
+     * Helpers (ids, UI)
+     ***********************/
+    function uid(){
+      return Math.random().toString(16).slice(2) + Date.now().toString(16);
+    }
+    function showToast(msg, emoji="✨"){
+      const screen = document.querySelector(".screen");
+      const t = document.createElement("div");
+      t.className = "toast";
+      t.textContent = `${emoji} ${msg}`;
+      screen.appendChild(t);
+      setTimeout(()=> t.remove(), 1550);
+    }
+    function confettiAt(x,y){
+      const colors = ["#7c4dff","#b56bff","#27c171","#ff4d5a","#ffd36b","#4fb5ff"];
+      const c = document.getElementById("confetti");
+      for(let i=0;i<26;i++){
+        const p = document.createElement("span");
+        p.className = "piece";
+        const dx = (Math.random()-0.5) * 240;
+        const dy = -(Math.random()*140 + 40);
+        const rot = (Math.random()*360) + "deg";
+        p.style.left = x + "px";
+        p.style.top = y + "px";
+        p.style.background = colors[Math.floor(Math.random()*colors.length)];
+        p.style.setProperty("--dx", dx + "px");
+        p.style.setProperty("--dy", dy + "px");
+        p.style.setProperty("--rot", rot);
+        c.appendChild(p);
+        setTimeout(()=>p.remove(), 900);
+      }
+    }
+
+    /***********************
+     * AI Suggestions (prototype)
+     ***********************/
+    const SUGGESTION_POOL = [
+      "Weekly bathroom deep clean",
+      "Organize garage this weekend",
+      "Change air filters",
+      "Wipe fridge shelves",
+      "Vacuum entryway",
+      "Clean microwave",
+      "Sort kids' backpacks",
+      "Water plants",
+      "Declutter coffee table",
+      "Check smoke alarm batteries"
+    ];
+
+    function pickSuggestions(n=3){
+      const pool = [...SUGGESTION_POOL];
+      const out = [];
+      while(out.length < n && pool.length){
+        const idx = Math.floor(Math.random()*pool.length);
+        out.push(pool.splice(idx,1)[0]);
+      }
+      return out;
+    }
+
+    let currentSuggestions = pickSuggestions(3);
+
+    function renderSuggestions(){
+      const wrap = document.getElementById("suggestions");
+      wrap.innerHTML = "";
+      currentSuggestions.forEach(text=>{
+        const row = document.createElement("div");
+        row.className = "suggestion";
+        row.innerHTML = `
+          <span>${escapeHtml(text)}</span>
+          <div class="mini-plus" title="Add this chore">+</div>
+        `;
+        row.querySelector(".mini-plus").addEventListener("click", ()=>{
+          openModalForAdd();
+          choreName.value = text;
+          validateModal();
+          showToast("Suggestion added to form", "➕");
+        });
+        wrap.appendChild(row);
+      });
+    }
+
+    /***********************
+     * Filters + Lists
+     ***********************/
+    function getFilteredChores(){
+      const top = state.topFilter || "thisweek";
+      const chores = state.chores || [];
+      if(top === "completed"){
+        return chores.filter(c => c.status === "done");
+      }
+      if(top === "all"){
+        return chores;
+      }
+      // thisweek
+      return chores.filter(c => inThisWeek(c.dueISO));
+    }
+
+    function activeChores(){
+      return getFilteredChores().filter(c => c.status === "active");
+    }
+    function doneChores(){
+      return (state.chores || []).filter(c => c.status === "done").sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+    }
+
+    function renderActive(){
+      const list = document.getElementById("activeList");
+      list.innerHTML = "";
+      const items = activeChores();
+
+      if(items.length === 0){
+        list.innerHTML = `<div class="empty">No active chores in this filter.</div>`;
+        return;
+      }
+
+      items.forEach(chore=>{
+        const el = document.createElement("div");
+        el.className = "task";
+        const dueLabel = isTodayISO(chore.dueISO) ? "Today" : fmtShort(chore.dueISO);
+        const dueClass = isTodayISO(chore.dueISO) ? "today" : "";
+        el.innerHTML = `
+          <div class="task-left">
+            <div class="donebtn" title="Mark completed" aria-label="Mark completed">
+              <span style="font-size:16px;">✓</span>
+            </div>
+            <div style="min-width:0;">
+              <div class="task-title">${escapeHtml(chore.name)}</div>
+              <div class="pillrow">
+                <div class="pill">${escapeHtml(chore.assignee || "Unassigned")}</div>
+                <div class="pill ${dueClass}">${escapeHtml(dueLabel)}</div>
+                <div class="pill">${escapeHtml(chore.frequency || "Once")}</div>
+              </div>
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="squarebtn edit" title="Edit" aria-label="Edit">
+              ${iconPencil()}
+            </button>
+            <button class="squarebtn delete" title="Delete" aria-label="Delete">
+              ${iconTrash()}
+            </button>
+          </div>
+        `;
+
+        // Complete
+        el.querySelector(".donebtn").addEventListener("click", (e)=>{
+          const btn = e.currentTarget;
+          btn.classList.add("done"); // red -> green immediately
+          btn.setAttribute("aria-label", "Completed");
+          const rect = btn.getBoundingClientRect();
+          const screenRect = document.querySelector(".screen").getBoundingClientRect();
+          confettiAt(rect.left - screenRect.left + rect.width/2, rect.top - screenRect.top + rect.height/2);
+
+          completeChore(chore.id);
+        });
+
+        // Edit/Delete
+        el.querySelector(".edit").addEventListener("click", ()=> openModalForEdit(chore.id));
+        el.querySelector(".delete").addEventListener("click", ()=> deleteChore(chore.id));
+
+        list.appendChild(el);
+      });
+    }
+
+    function renderHistory(){
+      renderCalendar();
+      const last = document.getElementById("lastDoneList");
+      last.innerHTML = "";
+
+      const items = doneChores().slice(0, 12);
+      if(items.length === 0){
+        last.innerHTML = `<div class="empty">Nothing completed yet. Complete a chore to see it here.</div>`;
+        return;
+      }
+
+      items.forEach(chore=>{
+        const el = document.createElement("div");
+        el.className = "task";
+        const when = chore.completedAt ? new Date(chore.completedAt) : null;
+        const whenLabel = when ? when.toLocaleString(undefined, { month:"short", day:"numeric" }) : "—";
+        el.innerHTML = `
+          <div class="task-left">
+            <div class="donebtn done" title="Completed" aria-label="Completed">
+              <span style="font-size:16px;color:var(--ok);">✓</span>
+            </div>
+            <div style="min-width:0;">
+              <div class="task-title">${escapeHtml(chore.name)}</div>
+              <div class="pillrow">
+                <div class="pill done">${escapeHtml(chore.assignee || "Unassigned")}</div>
+                <div class="pill done">${escapeHtml(whenLabel)}</div>
+              </div>
+            </div>
+          </div>
+          <div class="task-actions">
+            <button class="squarebtn delete" title="Delete from history" aria-label="Delete">
+              ${iconTrash()}
+            </button>
+          </div>
+        `;
+        el.querySelector(".delete").addEventListener("click", ()=> deleteChore(chore.id));
+        last.appendChild(el);
+      });
+    }
+
+    function renderFairness(){
+      const wrap = document.getElementById("fairPeople");
+      wrap.innerHTML = "";
+
+      // This week chores (active + done) by due date
+      const choresWeek = (state.chores||[]).filter(c => inThisWeek(c.dueISO));
+      const members = ["Mom","Dad","Sarah","Jake","Unassigned"];
+
+      const totals = {};
+      const completed = {};
+      members.forEach(m=>{ totals[m]=0; completed[m]=0; });
+
+      choresWeek.forEach(c=>{
+        const m = members.includes(c.assignee) ? c.assignee : "Unassigned";
+        totals[m] += 1;
+        if(c.status === "done") completed[m] += 1;
+      });
+
+      const maxTotal = Math.max(1, ...Object.values(totals));
+
+      members.forEach(m=>{
+        const t = totals[m];
+        const c = completed[m];
+        const pct = t ? Math.round((c/t)*100) : 0;
+        const workloadPct = Math.round((t/maxTotal)*100);
+
+        const row = document.createElement("div");
+        row.className = "person-row";
+        row.innerHTML = `
+          <div class="person-top">
+            <div style="display:flex;gap:10px;align-items:center;">
+              <div class="avatar"></div>
+              <div>
+                <div class="person-name">${escapeHtml(m)}</div>
+                <div class="person-sub">${t} chores total</div>
+              </div>
+            </div>
+            <div class="stats">${c}/${t} completed<br><span style="color:#4a2bff;font-weight:700;">${pct}%</span></div>
+          </div>
+
+          <div class="barlabel"><span>Completion</span><span>${pct}%</span></div>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+
+          <div class="barlabel"><span>Workload</span><span>${t} chores</span></div>
+          <div class="bar"><div class="fill" style="width:${workloadPct}%"></div></div>
+        `;
+        wrap.appendChild(row);
+      });
+
+      // Fairness score from workload distribution (lower variance = higher score)
+      const workloads = members.map(m => totals[m]);
+      const mean = workloads.reduce((a,b)=>a+b,0) / workloads.length;
+      const variance = workloads.reduce((a,b)=>a + Math.pow(b-mean,2),0) / workloads.length;
+      const std = Math.sqrt(variance);
+      const score = clamp(Math.round(100 - (mean ? (std/mean)*100 : 0)), 0, 100);
+
+      const ring = document.getElementById("fairRing");
+      ring.style.background = `conic-gradient(var(--purple) ${score*3.6}deg, rgba(124,77,255,.18) 0deg)`;
+      document.getElementById("fairPct").textContent = `${score}%`;
+      document.getElementById("fairNote").textContent =
+        score >= 85 ? "Distribution is fairly balanced." :
+        score >= 65 ? "Some imbalance—consider reassigning a chore." :
+                      "Workload is uneven—try redistributing chores.";
+    }
+
+    function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+    /***********************
+     * Calendar render (History)
+     ***********************/
+    function renderCalendar(){
+      const cursor = new Date(state.calendarCursor || new Date().toISOString());
+      const first = startOfMonth(cursor);
+      const last = endOfMonth(cursor);
+
+      document.getElementById("calMonth").textContent = formatMonthYear(cursor);
+
+      const grid = document.getElementById("calGrid");
+      grid.innerHTML = "";
+
+      // DOW header
+      const dows = ["S","M","T","W","T","F","S"];
+      dows.forEach(d=>{
+        const el = document.createElement("div");
+        el.className = "cal-dow";
+        el.textContent = d;
+        grid.appendChild(el);
+      });
+
+      // Leading blanks
+      const lead = first.getDay(); // Sunday=0
+      const prev = new Date(first);
+      prev.setDate(prev.getDate() - lead);
+
+      // We render 6 weeks * 7 days
+      const today = new Date();
+      const completedDates = new Set(
+        doneChores()
+          .filter(c => c.completedAt)
+          .map(c => isoFromDate(new Date(c.completedAt)))
+      );
+
+      for(let i=0;i<42;i++){
+        const day = new Date(prev);
+        day.setDate(prev.getDate()+i);
+
+        const cell = document.createElement("div");
+        const inMonth = day.getMonth() === cursor.getMonth();
+        const iso = isoFromDate(day);
+
+        cell.className = "cal-day" + (inMonth ? "" : " muted") + (sameDay(day,today) ? " today" : "");
+        cell.textContent = day.getDate();
+
+        if(completedDates.has(iso)){
+          const dot = document.createElement("div");
+          dot.className = "dot";
+          cell.appendChild(dot);
+        }
+
+        grid.appendChild(cell);
+      }
+    }
+
+    /***********************
+     * CRUD
+     ***********************/
+    function addChore(data){
+      state.chores.unshift({
+        id: uid(),
+        name: data.name.trim(),
+        assignee: data.assignee || "Unassigned",
+        dueISO: data.dueISO || isoToday(),
+        frequency: data.frequency || "Once",
+        status: "active",
+        createdAt: Date.now(),
+        completedAt: null
+      });
+      saveState();
+      renderAll();
+    }
+
+    function updateChore(id, patch){
+      const idx = state.chores.findIndex(c=>c.id===id);
+      if(idx<0) return;
+      state.chores[idx] = { ...state.chores[idx], ...patch };
+      saveState();
+      renderAll();
+    }
+
+    function deleteChore(id){
+      const before = state.chores.length;
+      state.chores = state.chores.filter(c=>c.id!==id);
+      saveState();
+      renderAll();
+      if(state.chores.length !== before) showToast("Chore deleted", "🗑️");
+    }
+
+    function completeChore(id){
+      const c = state.chores.find(x=>x.id===id);
+      if(!c) return;
+      c.status = "done";
+      c.completedAt = Date.now();
+      saveState();
+      renderAll();
+      showToast("Nice! Chore completed.", "✅");
+    }
+
+    /***********************
+     * Modal
+     ***********************/
+    const overlay = document.getElementById("overlay");
+    const choreName = document.getElementById("choreName");
+    const assignee = document.getElementById("assignee");
+    const duePreset = document.getElementById("duePreset");
+    const dueDate = document.getElementById("dueDate");
+    const datePickWrap = document.getElementById("datePickWrap");
+    const frequency = document.getElementById("frequency");
+    const saveBtn = document.getElementById("saveBtn");
+
+    function openModalForAdd(){
+      editingId = null;
+      document.getElementById("modalTitle").textContent = "Add Chore";
+      choreName.value = "";
+      assignee.value = "Unassigned";
+      duePreset.value = "today";
+      frequency.value = "Once";
+      datePickWrap.style.display = "none";
+      dueDate.value = isoToday();
+      overlay.classList.add("show");
+      choreName.focus();
+      validateModal();
+    }
+
+    function openModalForEdit(id){
+      const c = state.chores.find(x=>x.id===id);
+      if(!c) return;
+      editingId = id;
+      document.getElementById("modalTitle").textContent = "Edit Chore";
+      choreName.value = c.name || "";
+      assignee.value = c.assignee || "Unassigned";
+      frequency.value = c.frequency || "Once";
+      // For edit, default to pick
+      duePreset.value = "pick";
+      datePickWrap.style.display = "block";
+      dueDate.value = c.dueISO || isoToday();
+      overlay.classList.add("show");
+      choreName.focus();
+      validateModal();
+    }
+
+    function closeModal(){
+      overlay.classList.remove("show");
+      stopListening(); // important for safe optional voice
+    }
+
+    function validateModal(){
+      saveBtn.disabled = !choreName.value.trim();
+    }
+
+    function resolveDueISO(){
+      const preset = duePreset.value;
+      if(preset === "today") return isoToday();
+      if(preset === "tomorrow") return isoAddDays(1);
+      if(preset === "weekend"){
+        // next Saturday
+        const d = new Date();
+        const day = d.getDay(); // 0 Sun ... 6 Sat
+        const add = (6 - day + 7) % 7; // 0 if Saturday
+        d.setDate(d.getDate() + add);
+        return isoFromDate(d);
+      }
+      // pick
+      return (dueDate.value || isoToday());
+    }
+
+    duePreset.addEventListener("change", ()=>{
+      datePickWrap.style.display = (duePreset.value === "pick") ? "block" : "none";
+    });
+
+    choreName.addEventListener("input", validateModal);
+
+    document.getElementById("cancelBtn").addEventListener("click", closeModal);
+    document.getElementById("closeModal").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(); });
+
+    saveBtn.addEventListener("click", ()=>{
+      const data = {
+        name: choreName.value,
+        assignee: assignee.value,
+        dueISO: resolveDueISO(),
+        frequency: frequency.value
+      };
+
+      if(editingId){
+        updateChore(editingId, data);
+        showToast("Chore updated", "✏️");
+      }else{
+        addChore(data);
+        showToast("Chore added", "➕");
+      }
+      closeModal();
+    });
+
+    /***********************
+     * Navigation
+     ***********************/
+    function showPanel(name){
+      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.dataset.panel === name));
+      document.querySelectorAll(".navitem").forEach(n => n.classList.toggle("active", n.dataset.nav === name));
+      // Also keep content scrolled near top for clarity
+      document.getElementById("content").scrollTop = 0;
+    }
+
+    document.querySelectorAll(".navitem").forEach(item=>{
+      item.addEventListener("click", ()=>{
+        showPanel(item.dataset.nav);
+        renderAll();
+      });
+    });
+
+    // Top tabs: This Week / Completed / All
+    document.querySelectorAll(".top-tab").forEach(t=>{
+      t.addEventListener("click", ()=>{
+        document.querySelectorAll(".top-tab").forEach(x=>x.classList.toggle("active", x===t));
+        const key = t.dataset.top;
+        state.topFilter = key;
+        saveState();
+        renderAll();
+      });
+    });
+
+    /***********************
+     * Calendar navigation
+     ***********************/
+    document.getElementById("calPrev").addEventListener("click", ()=>{
+      const c = new Date(state.calendarCursor);
+      c.setMonth(c.getMonth()-1);
+      state.calendarCursor = startOfMonth(c).toISOString();
+      saveState();
+      renderCalendar();
+    });
+    document.getElementById("calNext").addEventListener("click", ()=>{
+      const c = new Date(state.calendarCursor);
+      c.setMonth(c.getMonth()+1);
+      state.calendarCursor = startOfMonth(c).toISOString();
+      saveState();
+      renderCalendar();
+    });
+
+    /***********************
+     * Buttons
+     ***********************/
+    document.getElementById("fab").addEventListener("click", openModalForAdd);
+    document.getElementById("addDashed").addEventListener("click", openModalForAdd);
+
+    document.getElementById("moreSuggestions").addEventListener("click", ()=>{
+      currentSuggestions = pickSuggestions(3);
+      renderSuggestions();
+      showToast("New suggestions", "✨");
+    });
+
+    /***********************
+     * Voice entry (Web Speech API) – optional, user-initiated
+     * - Click mic to open modal and dictate chore name.
+     ***********************/
+    let recognition = null;
+    let listening = false;
+
+    function initSpeech(){
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SR) return null;
+
+      const r = new SR();
+      r.lang = "en-US";           // change to "fr-FR" if you want French dictation
+      r.interimResults = true;
+      r.maxAlternatives = 1;
+      r.continuous = false;       // safer (stops after one utterance)
+      return r;
+    }
+
+    function startListening(){
+      if(!recognition) recognition = initSpeech();
+      if(!recognition){
+        showToast("Speech input not supported in this browser.", "🎙️");
+        return;
+      }
+
+      // Ensure modal open and input focused
+      if(!overlay.classList.contains("show")) openModalForAdd();
+      choreName.focus();
+
+      // Toggle start/stop
+      if(listening){
+        recognition.stop();
+        return;
+      }
+
+      listening = true;
+      setMicLive(true);
+      showToast("Listening… say the chore name", "🎙️");
+
+      let finalText = "";
+
+      recognition.onresult = (event) => {
+        let interim = "";
+        for(let i = event.resultIndex; i < event.results.length; i++){
+          const txt = event.results[i][0].transcript;
+          if(event.results[i].isFinal) finalText += txt;
+          else interim += txt;
+        }
+        const combined = (finalText + " " + interim).trim();
+        choreName.value = combined;
+        choreName.setSelectionRange(choreName.value.length, choreName.value.length);
+        validateModal();
+      };
+
+      recognition.onerror = (e) => {
+        showToast(`Voice error: ${e.error}`, "⚠️");
+      };
+
+      recognition.onend = () => {
+        listening = false;
+        setMicLive(false);
+        if(choreName.value.trim()){
+          showToast("Captured ✅ Review and tap Add Chore", "✅");
+        }else{
+          showToast("No speech detected", "🎙️");
+        }
+      };
+
+      try{
+        recognition.start();
+      }catch{
+        listening = false;
+        setMicLive(false);
+        showToast("Could not start mic (try again).", "🎙️");
+      }
+    }
+
+    function stopListening(){
+      if(recognition && listening){
+        try{ recognition.stop(); }catch{}
+      }
+      listening = false;
+      setMicLive(false);
+    }
+
+    function setMicLive(on){
+      const micBtn = document.getElementById("micBtn");
+      const micMini = document.getElementById("micMini");
+      micBtn.classList.toggle("mic-live", on);
+      micMini.classList.toggle("mic-live", on);
+    }
+
+    document.getElementById("micBtn").addEventListener("click", startListening);
+    document.getElementById("micMini").addEventListener("click", startListening);
+
+    /***********************
+     * Render All
+     ***********************/
+    function renderAll(){
+      // Keep top tab UI in sync (on reload)
+      const tf = state.topFilter || "thisweek";
+      document.querySelectorAll(".top-tab").forEach(t=>{
+        t.classList.toggle("active", t.dataset.top === tf);
+      });
+
+      renderSuggestions();
+      renderActive();
+      renderHistory();
+      renderFairness();
+    }
+
+    /***********************
+     * Small utilities
+     ***********************/
+    function escapeHtml(str){
+      return String(str)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function iconPencil(){
+      return `
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#7c4dff" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm2.92 2.83H5v-.92l9.06-9.06.92.92L5.92 20.08ZM20.71 7.04a1.0 1.0 0 0 0 0-1.41l-2.34-2.34a1.0 1.0 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/>
+        </svg>
+      `;
+    }
+    function iconTrash(){
+      return `
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#ff4d5a" d="M6 7h12l-1 14H7L6 7Zm3-3h6l1 2H8l1-2Zm-3 2h12v2H6V6Z"/>
+        </svg>
+      `;
+    }
+
+    /***********************
+     * Initial render
+     ***********************/
+    // Clean sample: "Sam" isn't in dropdown so it becomes Unassigned in fairness; that's ok for prototype
+    renderAll();
+  </script>
+</body>
+</html>
