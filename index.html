@@ -125,6 +125,9 @@
       top: 112px;
       z-index: 9;
     }
+    .top-tabs.hidden{
+      display:none;
+    }
     .top-tab{
       flex:1;
       text-align:center;
@@ -1513,6 +1516,8 @@
     function showPanel(name){
       document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.dataset.panel === name));
       document.querySelectorAll(".navitem").forEach(n => n.classList.toggle("active", n.dataset.nav === name));
+      const topTabs = document.querySelector(".top-tabs");
+      if(topTabs) topTabs.classList.toggle("hidden", name !== "home");
       // Also keep content scrolled near top for clarity
       document.getElementById("content").scrollTop = 0;
     }
@@ -1674,6 +1679,11 @@
       document.querySelectorAll(".top-tab").forEach(t=>{
         t.classList.toggle("active", t.dataset.top === tf);
       });
+      // Show/hide top-tabs based on active panel
+      const activePanel = document.querySelector(".panel.active");
+      const panelName = activePanel ? activePanel.dataset.panel : "home";
+      const topTabs = document.querySelector(".top-tabs");
+      if(topTabs) topTabs.classList.toggle("hidden", panelName !== "home");
 
       renderSuggestions();
       renderActive();
