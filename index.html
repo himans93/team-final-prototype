@@ -513,12 +513,13 @@
     .ring-card{
       text-align:center;
       padding: 18px 14px;
+      margin-bottom: 10px;
     }
     .ring{
-      width: 128px;
-      height: 128px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
-      margin: 10px auto 8px;
+      margin: 8px auto 6px;
       display:grid;
       place-items:center;
       background: conic-gradient(var(--purple) 0deg, rgba(124,77,255,.18) 0deg);
@@ -526,12 +527,12 @@
     }
     .ring::after{
       content:"";
-      width: 96px;
-      height: 96px;
+      width: 76px;
+      height: 76px;
       border-radius: 50%;
       background: #fff;
       position:absolute;
-      inset: 16px;
+      inset: 12px;
       border: 1px solid var(--border);
       box-shadow: var(--shadow2);
     }
@@ -846,15 +847,15 @@
 
         <!-- FAIRNESS -->
         <section class="panel" data-panel="fairness">
-          <div class="card fair-card">
-            <div class="fair-title">This Week · Chore Distribution</div>
-            <div id="fairPeople"></div>
-          </div>
-
           <div class="card ring-card">
             <div style="font-weight:800;color:#4a2bff;">Fairness Score</div>
             <div class="ring" id="fairRing"><span id="fairPct">--%</span></div>
             <div class="ring-note" id="fairNote">Distribution summary will appear here.</div>
+          </div>
+
+          <div class="card fair-card">
+            <div class="fair-title">This Week · Chore Distribution</div>
+            <div id="fairPeople"></div>
           </div>
         </section>
       </div>
