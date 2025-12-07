@@ -125,6 +125,9 @@
       top: 112px;
       z-index: 9;
     }
+    .top-tabs.hidden{
+      display:none;
+    }
     .top-tab{
       flex:1;
       text-align:center;
@@ -163,14 +166,32 @@
     .ai-card{
       background: linear-gradient(180deg, rgba(124,77,255,.10), rgba(155,73,255,.06));
       border: 1px solid rgba(124,77,255,.18);
+      margin-top: 10px;
     }
     .ai-title{
       display:flex;
       align-items:center;
+      justify-content:space-between;
       gap:10px;
       font-weight:700;
       margin-bottom: 8px;
       color: #3b2a86;
+      cursor:pointer;
+    }
+    .ai-title::after{
+      content:"▼";
+      transition:transform 0.2s ease;
+    }
+    .ai-card.expanded .ai-title::after{
+      transform:rotate(180deg);
+    }
+    .ai-content{
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 0.3s ease;
+    }
+    .ai-card.expanded .ai-content{
+      max-height:1000px;
     }
     .sparkle{
       width: 28px;
@@ -399,6 +420,15 @@
       font-weight: 800;
       color:#4a2bff;
     }
+    .cal-day.selected{
+      border-color: rgba(124,77,255,.45);
+      background: rgba(124,77,255,.20);
+      font-weight: 800;
+      cursor:pointer;
+    }
+    .cal-day:not(.muted):not(.selected){
+      cursor:pointer;
+    }
     .dot{
       position:absolute;
       width: 5px;
@@ -492,12 +522,13 @@
     .ring-card{
       text-align:center;
       padding: 18px 14px;
+      margin-bottom: 10px;
     }
     .ring{
-      width: 128px;
-      height: 128px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
-      margin: 10px auto 8px;
+      margin: 8px auto 6px;
       display:grid;
       place-items:center;
       background: conic-gradient(var(--purple) 0deg, rgba(124,77,255,.18) 0deg);
@@ -505,12 +536,12 @@
     }
     .ring::after{
       content:"";
-      width: 96px;
-      height: 96px;
+      width: 76px;
+      height: 76px;
       border-radius: 50%;
       background: #fff;
       position:absolute;
-      inset: 16px;
+      inset: 12px;
       border: 1px solid var(--border);
       box-shadow: var(--shadow2);
     }
@@ -775,21 +806,25 @@
 
       <div class="top-tabs" role="tablist" aria-label="Top tabs">
         <div class="top-tab active" data-top="thisweek">This Week</div>
-        <div class="top-tab" data-top="completed">Completed</div>
+        <div class="top-tab" data-top="upcoming">Upcoming</div>
         <div class="top-tab" data-top="all">All</div>
       </div>
 
       <div class="content" id="content">
         <!-- HOME -->
         <section class="panel active" data-panel="home">
-          <div class="card ai-card">
-            <div class="ai-title">
-              <div class="sparkle">✨</div>
-              AI Suggestions
+          <div class="card ai-card" id="aiCard">
+            <div class="ai-title" id="aiToggle">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="sparkle">✨</div>
+                AI Suggestions
+              </div>
             </div>
-            <div class="ai-sub">Based on your household, these chores might need attention:</div>
-            <div id="suggestions"></div>
-            <button class="ai-more" id="moreSuggestions">Get more suggestions</button>
+            <div class="ai-content">
+              <div class="ai-sub">Based on your household, these chores might need attention:</div>
+              <div id="suggestions"></div>
+              <button class="ai-more" id="moreSuggestions">Get more suggestions</button>
+            </div>
           </div>
 
           <div class="add-dashed" id="addDashed">+ Add new chore</div>
@@ -821,15 +856,15 @@
 
         <!-- FAIRNESS -->
         <section class="panel" data-panel="fairness">
-          <div class="card fair-card">
-            <div class="fair-title">This Week · Chore Distribution</div>
-            <div id="fairPeople"></div>
-          </div>
-
           <div class="card ring-card">
             <div style="font-weight:800;color:#4a2bff;">Fairness Score</div>
             <div class="ring" id="fairRing"><span id="fairPct">--%</span></div>
             <div class="ring-note" id="fairNote">Distribution summary will appear here.</div>
+          </div>
+
+          <div class="card fair-card">
+            <div class="fair-title">This Week · Chore Distribution</div>
+            <div id="fairPeople"></div>
           </div>
         </section>
       </div>
@@ -932,17 +967,39 @@
 
     const MEMBERS = ["Mom","Dad","Sarah","Jake","Unassigned"];
 
-    const defaultState = () => ({
-      chores: [
-        { id: uid(), name:"Take out trash", assignee:"Sam", dueISO: isoToday(), frequency:"Daily", status:"active", createdAt: Date.now(), completedAt: null },
-        { id: uid(), name:"Clean bathroom", assignee:"Mom", dueISO: isoAddDays(1), frequency:"Weekly", status:"active", createdAt: Date.now(), completedAt: null },
-      ],
-      calendarCursor: startOfMonth(new Date()).toISOString(),
-      topFilter: "thisweek"
-    });
+    const defaultState = () => {
+      // Helper to get a date N days ago
+      const daysAgo = (n) => {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        return d;
+      };
+      
+      // Helper to get timestamp N days ago
+      const timestampDaysAgo = (n) => {
+        return daysAgo(n).getTime();
+      };
+
+      return {
+        chores: [
+          { id: uid(), name:"Take out trash", assignee:"Sam", dueISO: isoToday(), frequency:"Daily", status:"active", createdAt: Date.now(), completedAt: null },
+          { id: uid(), name:"Clean bathroom", assignee:"Mom", dueISO: isoAddDays(1), frequency:"Weekly", status:"active", createdAt: Date.now(), completedAt: null },
+          // Last week completed tasks
+          { id: uid(), name:"Vacuum living room", assignee:"Mom", dueISO: isoFromDate(daysAgo(8)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(9), completedAt: timestampDaysAgo(8) },
+          { id: uid(), name:"Do laundry", assignee:"Sarah", dueISO: isoFromDate(daysAgo(7)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(8), completedAt: timestampDaysAgo(7) },
+          { id: uid(), name:"Wash dishes", assignee:"Jake", dueISO: isoFromDate(daysAgo(6)), frequency:"Daily", status:"done", createdAt: timestampDaysAgo(7), completedAt: timestampDaysAgo(6) },
+          { id: uid(), name:"Take out trash", assignee:"Dad", dueISO: isoFromDate(daysAgo(5)), frequency:"Daily", status:"done", createdAt: timestampDaysAgo(6), completedAt: timestampDaysAgo(5) },
+          { id: uid(), name:"Clean kitchen", assignee:"Mom", dueISO: isoFromDate(daysAgo(4)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(5), completedAt: timestampDaysAgo(4) },
+          { id: uid(), name:"Water plants", assignee:"Sarah", dueISO: isoFromDate(daysAgo(3)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(4), completedAt: timestampDaysAgo(3) },
+        ],
+        calendarCursor: startOfMonth(new Date()).toISOString(),
+        topFilter: "thisweek"
+      };
+    };
 
     let state = loadState();
     let editingId = null;
+    let selectedDateISO = null; // Track selected calendar date
 
     function loadState(){
       try{
@@ -953,6 +1010,10 @@
         parsed.chores ||= [];
         parsed.calendarCursor ||= startOfMonth(new Date()).toISOString();
         parsed.topFilter ||= "thisweek";
+        // Migrate old "completed" filter to "thisweek"
+        if(parsed.topFilter === "completed"){
+          parsed.topFilter = "thisweek";
+        }
         return parsed;
       }catch{
         return defaultState();
@@ -1008,6 +1069,11 @@
       const s = startOfWeekMonday(new Date());
       const e = endOfWeekMonday(new Date());
       return d >= s && d <= e;
+    }
+    function isUpcoming(iso){
+      const d = parseISO(iso);
+      const e = endOfWeekMonday(new Date());
+      return d > e;
     }
     function formatMonthYear(date){
       return date.toLocaleString(undefined, { month:"long", year:"numeric" });
@@ -1106,11 +1172,11 @@
     function getFilteredChores(){
       const top = state.topFilter || "thisweek";
       const chores = state.chores || [];
-      if(top === "completed"){
-        return chores.filter(c => c.status === "done");
+      if(top === "upcoming"){
+        return chores.filter(c => isUpcoming(c.dueISO));
       }
       if(top === "all"){
-        return chores;
+        return chores; // Return all chores (will be filtered to active by activeChores)
       }
       // thisweek
       return chores.filter(c => inThisWeek(c.dueISO));
@@ -1187,9 +1253,24 @@
       const last = document.getElementById("lastDoneList");
       last.innerHTML = "";
 
-      const items = doneChores().slice(0, 12);
+      let items = doneChores();
+      
+      // Filter by selected date if one is selected
+      if(selectedDateISO){
+        items = items.filter(chore => {
+          if(!chore.completedAt) return false;
+          const completedISO = isoFromDate(new Date(chore.completedAt));
+          return completedISO === selectedDateISO;
+        });
+      }else{
+        items = items.slice(0, 12);
+      }
+      
       if(items.length === 0){
-        last.innerHTML = `<div class="empty">Nothing completed yet. Complete a chore to see it here.</div>`;
+        const msg = selectedDateISO 
+          ? `No tasks completed on ${formatMonthYear(parseISO(selectedDateISO))} ${parseISO(selectedDateISO).getDate()}.`
+          : "Nothing completed yet. Complete a chore to see it here.";
+        last.innerHTML = `<div class="empty">${msg}</div>`;
         return;
       }
 
@@ -1332,13 +1413,29 @@
         const inMonth = day.getMonth() === cursor.getMonth();
         const iso = isoFromDate(day);
 
-        cell.className = "cal-day" + (inMonth ? "" : " muted") + (sameDay(day,today) ? " today" : "");
+        let className = "cal-day" + (inMonth ? "" : " muted") + (sameDay(day,today) ? " today" : "");
+        if(selectedDateISO === iso){
+          className += " selected";
+        }
+        cell.className = className;
         cell.textContent = day.getDate();
 
         if(completedDates.has(iso)){
           const dot = document.createElement("div");
           dot.className = "dot";
           cell.appendChild(dot);
+        }
+
+        // Add click handler to filter by date
+        if(inMonth){
+          cell.addEventListener("click", ()=>{
+            if(selectedDateISO === iso){
+              selectedDateISO = null; // Deselect if clicking same date
+            }else{
+              selectedDateISO = iso;
+            }
+            renderHistory();
+          });
         }
 
         grid.appendChild(cell);
@@ -1491,6 +1588,10 @@
     function showPanel(name){
       document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.dataset.panel === name));
       document.querySelectorAll(".navitem").forEach(n => n.classList.toggle("active", n.dataset.nav === name));
+      const topTabs = document.querySelector(".top-tabs");
+      if(topTabs) topTabs.classList.toggle("hidden", name !== "home");
+      // Clear selected date when leaving history panel
+      if(name !== "history") selectedDateISO = null;
       // Also keep content scrolled near top for clarity
       document.getElementById("content").scrollTop = 0;
     }
@@ -1520,15 +1621,17 @@
       const c = new Date(state.calendarCursor);
       c.setMonth(c.getMonth()-1);
       state.calendarCursor = startOfMonth(c).toISOString();
+      selectedDateISO = null; // Clear selection when changing months
       saveState();
-      renderCalendar();
+      renderHistory();
     });
     document.getElementById("calNext").addEventListener("click", ()=>{
       const c = new Date(state.calendarCursor);
       c.setMonth(c.getMonth()+1);
       state.calendarCursor = startOfMonth(c).toISOString();
+      selectedDateISO = null; // Clear selection when changing months
       saveState();
-      renderCalendar();
+      renderHistory();
     });
 
     /***********************
@@ -1536,6 +1639,10 @@
      ***********************/
     document.getElementById("fab").addEventListener("click", openModalForAdd);
     document.getElementById("addDashed").addEventListener("click", openModalForAdd);
+
+    document.getElementById("aiToggle").addEventListener("click", ()=>{
+      document.getElementById("aiCard").classList.toggle("expanded");
+    });
 
     document.getElementById("moreSuggestions").addEventListener("click", ()=>{
       currentSuggestions = pickSuggestions(3);
@@ -1648,6 +1755,11 @@
       document.querySelectorAll(".top-tab").forEach(t=>{
         t.classList.toggle("active", t.dataset.top === tf);
       });
+      // Show/hide top-tabs based on active panel
+      const activePanel = document.querySelector(".panel.active");
+      const panelName = activePanel ? activePanel.dataset.panel : "home";
+      const topTabs = document.querySelector(".top-tabs");
+      if(topTabs) topTabs.classList.toggle("hidden", panelName !== "home");
 
       renderSuggestions();
       renderActive();
