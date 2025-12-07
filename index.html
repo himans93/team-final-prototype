@@ -420,6 +420,15 @@
       font-weight: 800;
       color:#4a2bff;
     }
+    .cal-day.selected{
+      border-color: rgba(124,77,255,.45);
+      background: rgba(124,77,255,.20);
+      font-weight: 800;
+      cursor:pointer;
+    }
+    .cal-day:not(.muted):not(.selected){
+      cursor:pointer;
+    }
     .dot{
       position:absolute;
       width: 5px;
@@ -797,7 +806,7 @@
 
       <div class="top-tabs" role="tablist" aria-label="Top tabs">
         <div class="top-tab active" data-top="thisweek">This Week</div>
-        <div class="top-tab" data-top="completed">Completed</div>
+        <div class="top-tab" data-top="upcoming">Upcoming</div>
         <div class="top-tab" data-top="all">All</div>
       </div>
 
@@ -958,17 +967,39 @@
 
     const MEMBERS = ["Mom","Dad","Sarah","Jake","Unassigned"];
 
-    const defaultState = () => ({
-      chores: [
-        { id: uid(), name:"Take out trash", assignee:"Sam", dueISO: isoToday(), frequency:"Daily", status:"active", createdAt: Date.now(), completedAt: null },
-        { id: uid(), name:"Clean bathroom", assignee:"Mom", dueISO: isoAddDays(1), frequency:"Weekly", status:"active", createdAt: Date.now(), completedAt: null },
-      ],
-      calendarCursor: startOfMonth(new Date()).toISOString(),
-      topFilter: "thisweek"
-    });
+    const defaultState = () => {
+      // Helper to get a date N days ago
+      const daysAgo = (n) => {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        return d;
+      };
+      
+      // Helper to get timestamp N days ago
+      const timestampDaysAgo = (n) => {
+        return daysAgo(n).getTime();
+      };
+
+      return {
+        chores: [
+          { id: uid(), name:"Take out trash", assignee:"Sam", dueISO: isoToday(), frequency:"Daily", status:"active", createdAt: Date.now(), completedAt: null },
+          { id: uid(), name:"Clean bathroom", assignee:"Mom", dueISO: isoAddDays(1), frequency:"Weekly", status:"active", createdAt: Date.now(), completedAt: null },
+          // Last week completed tasks
+          { id: uid(), name:"Vacuum living room", assignee:"Mom", dueISO: isoFromDate(daysAgo(8)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(9), completedAt: timestampDaysAgo(8) },
+          { id: uid(), name:"Do laundry", assignee:"Sarah", dueISO: isoFromDate(daysAgo(7)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(8), completedAt: timestampDaysAgo(7) },
+          { id: uid(), name:"Wash dishes", assignee:"Jake", dueISO: isoFromDate(daysAgo(6)), frequency:"Daily", status:"done", createdAt: timestampDaysAgo(7), completedAt: timestampDaysAgo(6) },
+          { id: uid(), name:"Take out trash", assignee:"Dad", dueISO: isoFromDate(daysAgo(5)), frequency:"Daily", status:"done", createdAt: timestampDaysAgo(6), completedAt: timestampDaysAgo(5) },
+          { id: uid(), name:"Clean kitchen", assignee:"Mom", dueISO: isoFromDate(daysAgo(4)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(5), completedAt: timestampDaysAgo(4) },
+          { id: uid(), name:"Water plants", assignee:"Sarah", dueISO: isoFromDate(daysAgo(3)), frequency:"Weekly", status:"done", createdAt: timestampDaysAgo(4), completedAt: timestampDaysAgo(3) },
+        ],
+        calendarCursor: startOfMonth(new Date()).toISOString(),
+        topFilter: "thisweek"
+      };
+    };
 
     let state = loadState();
     let editingId = null;
+    let selectedDateISO = null; // Track selected calendar date
 
     function loadState(){
       try{
@@ -979,6 +1010,10 @@
         parsed.chores ||= [];
         parsed.calendarCursor ||= startOfMonth(new Date()).toISOString();
         parsed.topFilter ||= "thisweek";
+        // Migrate old "completed" filter to "thisweek"
+        if(parsed.topFilter === "completed"){
+          parsed.topFilter = "thisweek";
+        }
         return parsed;
       }catch{
         return defaultState();
@@ -1034,6 +1069,11 @@
       const s = startOfWeekMonday(new Date());
       const e = endOfWeekMonday(new Date());
       return d >= s && d <= e;
+    }
+    function isUpcoming(iso){
+      const d = parseISO(iso);
+      const e = endOfWeekMonday(new Date());
+      return d > e;
     }
     function formatMonthYear(date){
       return date.toLocaleString(undefined, { month:"long", year:"numeric" });
@@ -1132,11 +1172,11 @@
     function getFilteredChores(){
       const top = state.topFilter || "thisweek";
       const chores = state.chores || [];
-      if(top === "completed"){
-        return chores.filter(c => c.status === "done");
+      if(top === "upcoming"){
+        return chores.filter(c => isUpcoming(c.dueISO));
       }
       if(top === "all"){
-        return chores;
+        return chores; // Return all chores (will be filtered to active by activeChores)
       }
       // thisweek
       return chores.filter(c => inThisWeek(c.dueISO));
@@ -1213,9 +1253,24 @@
       const last = document.getElementById("lastDoneList");
       last.innerHTML = "";
 
-      const items = doneChores().slice(0, 12);
+      let items = doneChores();
+      
+      // Filter by selected date if one is selected
+      if(selectedDateISO){
+        items = items.filter(chore => {
+          if(!chore.completedAt) return false;
+          const completedISO = isoFromDate(new Date(chore.completedAt));
+          return completedISO === selectedDateISO;
+        });
+      }else{
+        items = items.slice(0, 12);
+      }
+      
       if(items.length === 0){
-        last.innerHTML = `<div class="empty">Nothing completed yet. Complete a chore to see it here.</div>`;
+        const msg = selectedDateISO 
+          ? `No tasks completed on ${formatMonthYear(parseISO(selectedDateISO))} ${parseISO(selectedDateISO).getDate()}.`
+          : "Nothing completed yet. Complete a chore to see it here.";
+        last.innerHTML = `<div class="empty">${msg}</div>`;
         return;
       }
 
@@ -1358,13 +1413,29 @@
         const inMonth = day.getMonth() === cursor.getMonth();
         const iso = isoFromDate(day);
 
-        cell.className = "cal-day" + (inMonth ? "" : " muted") + (sameDay(day,today) ? " today" : "");
+        let className = "cal-day" + (inMonth ? "" : " muted") + (sameDay(day,today) ? " today" : "");
+        if(selectedDateISO === iso){
+          className += " selected";
+        }
+        cell.className = className;
         cell.textContent = day.getDate();
 
         if(completedDates.has(iso)){
           const dot = document.createElement("div");
           dot.className = "dot";
           cell.appendChild(dot);
+        }
+
+        // Add click handler to filter by date
+        if(inMonth){
+          cell.addEventListener("click", ()=>{
+            if(selectedDateISO === iso){
+              selectedDateISO = null; // Deselect if clicking same date
+            }else{
+              selectedDateISO = iso;
+            }
+            renderHistory();
+          });
         }
 
         grid.appendChild(cell);
@@ -1519,6 +1590,8 @@
       document.querySelectorAll(".navitem").forEach(n => n.classList.toggle("active", n.dataset.nav === name));
       const topTabs = document.querySelector(".top-tabs");
       if(topTabs) topTabs.classList.toggle("hidden", name !== "home");
+      // Clear selected date when leaving history panel
+      if(name !== "history") selectedDateISO = null;
       // Also keep content scrolled near top for clarity
       document.getElementById("content").scrollTop = 0;
     }
@@ -1548,15 +1621,17 @@
       const c = new Date(state.calendarCursor);
       c.setMonth(c.getMonth()-1);
       state.calendarCursor = startOfMonth(c).toISOString();
+      selectedDateISO = null; // Clear selection when changing months
       saveState();
-      renderCalendar();
+      renderHistory();
     });
     document.getElementById("calNext").addEventListener("click", ()=>{
       const c = new Date(state.calendarCursor);
       c.setMonth(c.getMonth()+1);
       state.calendarCursor = startOfMonth(c).toISOString();
+      selectedDateISO = null; // Clear selection when changing months
       saveState();
-      renderCalendar();
+      renderHistory();
     });
 
     /***********************
